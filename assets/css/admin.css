@@ -1,0 +1,11 @@
+.simply-send-wrap .form-table th {
+  width: 200px;
+}
+
+.simply-send-wrap .description {
+  max-width: 42rem;
+}
+
+.simply-send-wrap h1 {
+  margin-bottom: 0.5rem;
+}
