@@ -1,10 +1,10 @@
-=== Simply Send ===
-Contributors: simplyinventlabs
+=== Simply Send by Simply Invent Labs ===
+Contributors: simplysend
 Tags: email, transactional email, api, deliverability, simply send
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 1.0.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,13 @@ Send WordPress email through the Simply Send transactional API — contact forms
 
 == Description ==
 
-The official Simply Send integration from Simply Invent Labs routes WordPress site email through your Simply Send account. It uses the transactional HTTP API directly, without a separate SMTP mailer plugin.
+This is the official WordPress integration for the Simply Send email service, a product of Simply Invent Labs LLC. It is designed for site owners who already use, or want to use, a Simply Send account for transactional email.
+
+The plugin routes WordPress `wp_mail` messages to the Simply Send transactional HTTPS API using an Account ID and transactional API key. It does not configure a generic SMTP server or offer a choice of third-party mail providers.
+
+Service-specific features include separate checks for Simply Send company-address, unsubscribe, and report-abuse template markers, encrypted storage of the API key, and recipient/attachment validation that matches the Simply Send public API. This connects WordPress password resets, site notifications, and contact forms that use `wp_mail` to the user's Simply Send account. Plugins that use their own email service need separate configuration.
+
+Service publisher: [Simply Invent Labs LLC](https://simplyinventlabs.com/).
 
 Simply Send replaces unreliable PHP `mail()` by routing `wp_mail` through the [Simply Send](https://www.simplysend.email) transactional HTTP API.
 
@@ -42,8 +48,8 @@ Privacy Policy: https://www.simplysend.email/privacy
 
 == Installation ==
 
-1. Upload the plugin folder to `/wp-content/plugins/simply-send` or install the ZIP via Plugins → Add New → Upload Plugin.
-2. Activate **Simply Send**.
+1. After directory approval, install the plugin from Plugins → Add New. For review or manual installation, upload the official ZIP via Plugins → Add New → Upload Plugin.
+2. Activate **Simply Send by Simply Invent Labs**.
 3. In Simply Send, create a **transactional API key** and copy your **Account ID**.
 4. Go to Settings → Simply Send in WordPress and paste the API key, Account ID, and From email.
 5. Enable Simply Send and send a test email.
@@ -76,11 +82,5 @@ For account setup, API credentials, or delivery questions, visit https://www.sim
 
 == Changelog ==
 
-= 1.0.2 =
-* Use Simply Send as the plugin name and simply-send as the translation domain and installation folder.
-
-= 1.0.1 =
-* Align the translation text domain and installation folder with the WordPress.org plugin slug.
-
-= 1.0.0 =
-* Initial release — transactional API via `pre_wp_mail`, settings UI, and test email.
+= 1.0.6 =
+* Initial release.

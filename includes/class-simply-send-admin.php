@@ -80,8 +80,15 @@ class Simply_Send_Admin {
 		wp_enqueue_style(
 			'simply-send-admin',
 			SIMPLY_SEND_PLUGIN_URL . 'assets/css/admin.css',
-			array(),
+			array( 'dashicons' ),
 			SIMPLY_SEND_VERSION
+		);
+		wp_enqueue_script(
+			'simply-send-admin',
+			SIMPLY_SEND_PLUGIN_URL . 'assets/js/admin.js',
+			array(),
+			SIMPLY_SEND_VERSION,
+			true
 		);
 	}
 
@@ -185,109 +192,67 @@ class Simply_Send_Admin {
 			return;
 		}
 
-		$settings = Simply_Send_Settings::get();
-		$user     = wp_get_current_user();
-		$test_to  = $user instanceof WP_User ? $user->user_email : '';
+		$settings       = Simply_Send_Settings::get();
+		$user           = wp_get_current_user();
+		$test_to        = $user instanceof WP_User ? $user->user_email : '';
+		$has_key        = '' !== Simply_Send_Settings::get_api_key( $settings );
+		$has_account    = $has_key && ! empty( $settings['account_id'] );
+		$has_sender     = $has_account && is_email( $settings['from_email'] );
+		$ready          = Simply_Send_Settings::is_ready( $settings );
+		$current_step   = ! $has_account ? 1 : ( ! $has_sender ? 2 : 3 );
 		?>
 		<div class="wrap simply-send-wrap">
-			<h1><?php echo esc_html__( 'Simply Send', 'simply-send' ); ?></h1>
-			<p class="description">
-				<?php
-				echo esc_html__(
-					'Route all WordPress email through the Simply Send transactional API. Create a transactional API key in your Simply Send account, then paste it below with your Account ID.',
-					'simply-send'
-				);
-				?>
-			</p>
-			<p>
-				<a class="button button-secondary" href="https://app.simplysend.email/api-keys" target="_blank" rel="noopener noreferrer">
-					<?php echo esc_html__( 'Open API Keys', 'simply-send' ); ?>
-				</a>
-				<a class="button button-secondary" href="https://app.simplysend.email/account" target="_blank" rel="noopener noreferrer">
-					<?php echo esc_html__( 'Account ID', 'simply-send' ); ?>
-				</a>
-				<a class="button button-link" href="https://www.simplysend.email/docs/guide/integrations/wordpress-plugin" target="_blank" rel="noopener noreferrer">
-					<?php echo esc_html__( 'Setup guide', 'simply-send' ); ?>
-				</a>
-			</p>
-
-
-			<form method="post" action="">
-				<?php wp_nonce_field( 'simply_send_save_settings' ); ?>
-
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><?php echo esc_html__( 'Enable Simply Send', 'simply-send' ); ?></th>
-						<td>
-							<label>
-								<input type="checkbox" name="enabled" value="1" <?php checked( ! empty( $settings['enabled'] ) ); ?> />
-								<?php echo esc_html__( 'Send WordPress email and attachments to Simply Send for delivery', 'simply-send' ); ?>
-							</label>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="simply_send_api_key"><?php echo esc_html__( 'Transactional API Key', 'simply-send' ); ?></label></th>
-						<td>
-							<input type="password" class="regular-text" id="simply_send_api_key" name="api_key" value="" autocomplete="new-password" placeholder="<?php echo esc_attr( ! empty( $settings['api_key'] ) ? '••••••••' : '' ); ?>" />
-							<p class="description"><?php echo esc_html__( 'Create a transactional API key in Simply Send. Leave blank to keep the current key.', 'simply-send' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="simply_send_account_id"><?php echo esc_html__( 'Account ID', 'simply-send' ); ?></label></th>
-						<td>
-							<input type="text" class="regular-text" id="simply_send_account_id" name="account_id" value="<?php echo esc_attr( $settings['account_id'] ); ?>" autocomplete="off" />
-							<p class="description"><?php echo esc_html__( 'Found on your Simply Send Account page (sent as X-Id).', 'simply-send' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="simply_send_from_email"><?php echo esc_html__( 'From Email', 'simply-send' ); ?></label></th>
-						<td>
-							<input type="email" class="regular-text" id="simply_send_from_email" name="from_email" value="<?php echo esc_attr( $settings['from_email'] ); ?>" />
-							<p class="description"><?php echo esc_html__( 'Must be an address on a verified transactional domain in Simply Send.', 'simply-send' ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="simply_send_from_name"><?php echo esc_html__( 'From Name', 'simply-send' ); ?></label></th>
-						<td>
-							<input type="text" class="regular-text" id="simply_send_from_name" name="from_name" value="<?php echo esc_attr( $settings['from_name'] ); ?>" />
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php echo esc_html__( 'Force From Address', 'simply-send' ); ?></th>
-						<td>
-							<label>
-								<input type="checkbox" name="force_from" value="1" <?php checked( ! empty( $settings['force_from'] ) ); ?> />
-								<?php echo esc_html__( 'Override other plugins that set a different From address', 'simply-send' ); ?>
-							</label>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="simply_send_api_url"><?php echo esc_html__( 'API URL', 'simply-send' ); ?></label></th>
-						<td>
-							<code id="simply_send_api_url"><?php echo esc_html( Simply_Send_Settings::API_URL ); ?></code>
-							<p class="description"><?php echo esc_html__( 'Default: https://tapi.simplysend.email/send', 'simply-send' ); ?></p>
-						</td>
-					</tr>
-				</table>
-
-				<?php submit_button( __( 'Save Settings', 'simply-send' ), 'primary', 'simply_send_save' ); ?>
-			</form>
-
-			<hr />
-
-			<h2><?php echo esc_html__( 'Send a test email', 'simply-send' ); ?></h2>
-			<form method="post" action="">
-				<?php wp_nonce_field( 'simply_send_test_email' ); ?>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="simply_send_test_email"><?php echo esc_html__( 'Recipient', 'simply-send' ); ?></label></th>
-						<td>
-							<input type="email" class="regular-text" id="simply_send_test_email" name="test_email" value="<?php echo esc_attr( $test_to ); ?>" />
-						</td>
-					</tr>
-				</table>
-				<?php submit_button( __( 'Send Test Email', 'simply-send' ), 'secondary', 'simply_send_test', false ); ?>
-			</form>
+			<header class="ss-header">
+				<div class="ss-brand"><img src="<?php echo esc_url( SIMPLY_SEND_PLUGIN_URL . 'assets/images/simply-send-logo.png' ); ?>" alt="" width="32" height="32" /><span><?php echo esc_html__( 'Simply Send', 'simply-send' ); ?><small class="ss-publisher"><?php echo esc_html__( 'by Simply Invent Labs', 'simply-send' ); ?></small></span></div>
+				<a class="ss-help" href="https://www.simplysend.email/docs/guide/integrations/wordpress-plugin" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-book" aria-hidden="true"></span><span><?php echo esc_html__( 'Setup guide', 'simply-send' ); ?></span><span class="dashicons dashicons-external" aria-hidden="true"></span></a>
+			</header>
+			<div class="ss-intro">
+				<div><p class="ss-eyebrow"><span><?php echo esc_html__( 'WORDPRESS INTEGRATION', 'simply-send' ); ?></span></p><h1><?php echo esc_html__( 'Give your site email a reliable route.', 'simply-send' ); ?></h1><p><span><?php echo esc_html__( 'Connect your account, choose your sender, and send your first test email.', 'simply-send' ); ?></span></p></div>
+				<span class="ss-status <?php echo $ready ? 'ss-status-ready' : ''; ?>"><span class="ss-status-dot" aria-hidden="true"></span><span><?php echo $ready ? esc_html__( 'Sending enabled', 'simply-send' ) : esc_html__( 'Setup in progress', 'simply-send' ); ?></span></span>
+			</div>
+			<nav class="ss-progress" aria-label="<?php echo esc_attr__( 'Setup progress', 'simply-send' ); ?>">
+				<a href="#ss-account"><span class="dashicons <?php echo $has_account ? 'dashicons-yes-alt' : 'dashicons-admin-network'; ?>" aria-hidden="true"></span><span><?php echo esc_html__( 'Account', 'simply-send' ); ?></span></a><span class="dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>
+				<a href="#ss-sender"><span class="dashicons <?php echo $has_sender ? 'dashicons-yes-alt' : 'dashicons-email-alt'; ?>" aria-hidden="true"></span><span><?php echo esc_html__( 'Sender', 'simply-send' ); ?></span></a><span class="dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>
+				<a href="#ss-delivery"><span class="dashicons dashicons-controls-play" aria-hidden="true"></span><span><?php echo esc_html__( 'Delivery test', 'simply-send' ); ?></span></a>
+			</nav>
+			<div class="ss-workflow">
+				<form method="post" action="">
+					<?php wp_nonce_field( 'simply_send_save_settings' ); ?>
+					<section id="ss-account" class="ss-step <?php echo $has_account ? 'ss-step-complete' : ''; ?>" <?php if ( 1 === $current_step ) { echo 'aria-current="step"'; } ?>>
+						<span class="ss-step-number" aria-hidden="true">1</span>
+						<div class="ss-step-heading"><div><h2><?php echo esc_html__( 'Connect your Simply Send account', 'simply-send' ); ?></h2><p><span><?php echo esc_html__( 'Use a transactional API key and the Account ID from your dashboard.', 'simply-send' ); ?></span></p></div><?php if ( $has_account ) : ?><span class="ss-step-badge"><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span><span><?php echo esc_html__( 'Credentials saved', 'simply-send' ); ?></span></span><?php endif; ?></div>
+						<div class="ss-actions"><a class="ss-button ss-button-secondary" href="https://app.simplysend.email/api-keys" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span><span><?php echo esc_html__( 'Create an API key', 'simply-send' ); ?></span><span class="dashicons dashicons-external" aria-hidden="true"></span></a><span class="ss-action-note"><?php echo esc_html__( 'Already have one? Enter it below.', 'simply-send' ); ?></span></div>
+						<div class="ss-fields">
+							<div class="ss-field"><label for="simply_send_api_key"><span class="dashicons dashicons-admin-network" aria-hidden="true"></span><span><?php echo esc_html__( 'Transactional API key', 'simply-send' ); ?></span></label><div class="ss-key-control"><input type="password" id="simply_send_api_key" name="api_key" value="" autocomplete="new-password" placeholder="<?php echo esc_attr( $has_key ? '••••••••••••••••' : __( 'Paste your transactional API key', 'simply-send' ) ); ?>" aria-describedby="ss-key-help" <?php if ( ! $has_key ) { echo 'required'; } ?> /><button type="button" class="ss-button ss-button-secondary ss-key-toggle" aria-controls="simply_send_api_key" aria-pressed="false" aria-label="<?php echo esc_attr__( 'Show API key', 'simply-send' ); ?>" data-show="<?php echo esc_attr__( 'Show', 'simply-send' ); ?>" data-hide="<?php echo esc_attr__( 'Hide', 'simply-send' ); ?>" data-show-label="<?php echo esc_attr__( 'Show API key', 'simply-send' ); ?>" data-hide-label="<?php echo esc_attr__( 'Hide API key', 'simply-send' ); ?>" hidden><span class="dashicons dashicons-visibility" aria-hidden="true"></span><span class="ss-key-toggle-text"><?php echo esc_html__( 'Show', 'simply-send' ); ?></span></button></div><p id="ss-key-help"><span><?php echo $has_key ? esc_html__( 'Your key is stored securely. Leave blank to keep it, or paste a replacement.', 'simply-send' ) : esc_html__( 'Stored with encryption. SMTP usernames and passwords do not work here.', 'simply-send' ); ?></span></p></div>
+							<div class="ss-field"><label for="simply_send_account_id"><span class="dashicons dashicons-id" aria-hidden="true"></span><span><?php echo esc_html__( 'Account ID', 'simply-send' ); ?></span></label><input type="text" id="simply_send_account_id" name="account_id" value="<?php echo esc_attr( $settings['account_id'] ); ?>" autocomplete="off" placeholder="<?php echo esc_attr__( 'Paste your Account ID', 'simply-send' ); ?>" required aria-describedby="ss-account-help" /><p id="ss-account-help"><span><a href="https://app.simplysend.email/account" target="_blank" rel="noopener noreferrer"><?php echo esc_html__( 'Find your Account ID', 'simply-send' ); ?></a><?php echo esc_html__( ' in the Simply Send dashboard.', 'simply-send' ); ?></span></p></div>
+						</div>
+					</section>
+					<section id="ss-sender" class="ss-step <?php echo $has_sender ? 'ss-step-complete' : ''; ?>" <?php if ( 2 === $current_step ) { echo 'aria-current="step"'; } ?>>
+						<span class="ss-step-number" aria-hidden="true">2</span>
+						<div class="ss-step-heading"><div><h2><?php echo esc_html__( 'Make it feel like your site', 'simply-send' ); ?></h2><p><span><?php echo esc_html__( 'Choose the name and verified email address your recipients will see.', 'simply-send' ); ?></span></p></div><?php if ( $has_sender ) : ?><span class="ss-step-badge"><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span><span><?php echo esc_html__( 'Sender saved', 'simply-send' ); ?></span></span><?php endif; ?></div>
+						<div class="ss-fields">
+							<div class="ss-field"><label for="simply_send_from_email"><span class="dashicons dashicons-email-alt" aria-hidden="true"></span><span><?php echo esc_html__( 'From email', 'simply-send' ); ?></span></label><input type="email" id="simply_send_from_email" name="from_email" value="<?php echo esc_attr( $settings['from_email'] ); ?>" placeholder="hello@yourdomain.com" required aria-describedby="ss-from-help" /><p id="ss-from-help"><span><?php echo esc_html__( 'Use an address on a verified transactional domain.', 'simply-send' ); ?></span></p></div>
+							<div class="ss-field"><label for="simply_send_from_name"><span class="dashicons dashicons-admin-users" aria-hidden="true"></span><span><?php echo esc_html__( 'From name', 'simply-send' ); ?></span><span class="ss-optional"><?php echo esc_html__( 'Optional', 'simply-send' ); ?></span></label><input type="text" id="simply_send_from_name" name="from_name" value="<?php echo esc_attr( $settings['from_name'] ); ?>" placeholder="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>" /></div>
+						</div>
+						<label class="ss-checkbox"><input type="checkbox" name="force_from" value="1" <?php checked( ! empty( $settings['force_from'] ) ); ?> /><span><strong><?php echo esc_html__( 'Use this sender for site emails', 'simply-send' ); ?></strong><span><?php echo esc_html__( 'Override sender names and addresses set by other plugins.', 'simply-send' ); ?></span></span></label>
+					</section>
+					<section id="ss-delivery" class="ss-step" <?php if ( 3 === $current_step ) { echo 'aria-current="step"'; } ?>>
+						<span class="ss-step-number" aria-hidden="true">3</span>
+						<div class="ss-step-heading"><div><h2><?php echo esc_html__( 'Turn on delivery and test it', 'simply-send' ); ?></h2><p><span><?php echo esc_html__( 'Save your setup, then send a test to an inbox you can check.', 'simply-send' ); ?></span></p></div></div>
+						<label class="ss-checkbox ss-delivery-toggle"><input type="checkbox" name="enabled" value="1" <?php checked( ! empty( $settings['enabled'] ) ); ?> /><span><strong><?php echo esc_html__( 'Send site email through Simply Send', 'simply-send' ); ?></strong><span><?php echo esc_html__( 'Send message content, recipients, and attachments to Simply Send for delivery. Disable other mail-routing plugins first.', 'simply-send' ); ?></span></span></label>
+						<div class="ss-actions"><button type="submit" name="simply_send_save" value="1" class="ss-button ss-button-primary"><span class="dashicons dashicons-saved" aria-hidden="true"></span><span><?php echo esc_html__( 'Save setup', 'simply-send' ); ?></span></button><span class="ss-action-note"><?php echo esc_html__( 'Sending uses your Simply Send plan.', 'simply-send' ); ?></span></div>
+					</section>
+				</form>
+				<div class="ss-test-panel">
+					<div class="ss-test-title"><span class="dashicons dashicons-email" aria-hidden="true"></span><div><h3><?php echo esc_html__( 'Send your first test email', 'simply-send' ); ?></h3><p><span><?php echo $ready ? esc_html__( 'Confirm receipt in your inbox and check email activity in Simply Send.', 'simply-send' ) : esc_html__( 'Complete your setup, enable delivery, and save before sending a test.', 'simply-send' ); ?></span></p></div></div>
+					<form method="post" action="" class="ss-test-form">
+						<?php wp_nonce_field( 'simply_send_test_email' ); ?>
+						<div class="ss-field"><label for="simply_send_test_email"><span><?php echo esc_html__( 'Recipient', 'simply-send' ); ?></span></label><input type="email" id="simply_send_test_email" name="test_email" value="<?php echo esc_attr( $test_to ); ?>" required /></div>
+						<button type="submit" name="simply_send_test" value="1" class="ss-button ss-button-secondary" <?php disabled( ! $ready ); ?>><span class="dashicons dashicons-arrow-right-alt" aria-hidden="true"></span><span><?php echo esc_html__( 'Send test email', 'simply-send' ); ?></span></button>
+					</form>
+				</div>
+			</div>
+			<footer class="ss-footer"><span class="dashicons dashicons-lock" aria-hidden="true"></span><span><?php echo esc_html__( 'Encrypted API key storage. Secure HTTPS delivery.', 'simply-send' ); ?></span><details><summary><?php echo esc_html__( 'Connection details', 'simply-send' ); ?></summary><code id="simply_send_api_url"><?php echo esc_html( Simply_Send_Settings::API_URL ); ?></code></details></footer>
 		</div>
 		<?php
 	}

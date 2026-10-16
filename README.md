@@ -1,6 +1,6 @@
-# Simply Send
+# Simply Send by Simply Invent Labs
 
-Official WordPress plugin for [Simply Send](https://www.simplysend.email). Intercepts `wp_mail` and sends through the **transactional HTTP API** (same approach as Resend’s official plugin).
+Official WordPress plugin for [Simply Send](https://www.simplysend.email). Intercepts `wp_mail` and sends through the **transactional HTTP API**.
 
 ## Features
 
@@ -16,12 +16,14 @@ Official WordPress plugin for [Simply Send](https://www.simplysend.email). Inter
 From this repository root:
 
 ```bash
-mkdir -p dist/simply-send
-rsync -a --exclude dist --exclude .git --exclude '*.md' --exclude tests --exclude 'index-placeholder-ignore' ./ dist/simply-send/
-cd dist && zip -r simply-send-1.0.2.zip simply-send
+mkdir -p dist/simply-send/assets
+cp simply-send.php uninstall.php readme.txt dist/simply-send/
+cp -R includes dist/simply-send/
+cp -R assets/. dist/simply-send/assets/
+cd dist && zip -r simply-send-1.0.6.zip simply-send
 ```
 
-Upload `simply-send-1.0.2.zip` in WordPress: **Plugins → Add New → Upload Plugin**.
+Upload `simply-send-1.0.6.zip` in WordPress: **Plugins → Add New → Upload Plugin**.
 
 ## Configure
 
