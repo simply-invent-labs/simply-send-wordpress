@@ -203,7 +203,7 @@ class Simply_Send_Admin {
 		?>
 		<div class="wrap simply-send-wrap">
 			<header class="ss-header">
-				<div class="ss-brand"><img src="<?php echo esc_url( SIMPLY_SEND_PLUGIN_URL . 'assets/images/simply-send-logo.png' ); ?>" alt="" width="32" height="32" /><span><?php echo esc_html__( 'Simply Send', 'simply-send' ); ?><small class="ss-publisher"><?php echo esc_html__( 'by Simply Invent Labs', 'simply-send' ); ?></small></span></div>
+				<div class="ss-brand"><img src="<?php echo esc_url( SIMPLY_SEND_PLUGIN_URL . 'assets/images/simply-send-logo.png' ); ?>" alt="" width="48" height="48" /><span><?php echo esc_html__( 'Simply Send', 'simply-send' ); ?><small class="ss-publisher"><?php echo esc_html__( 'by Simply Invent Labs', 'simply-send' ); ?></small></span></div>
 				<a class="ss-help" href="https://www.simplysend.email/docs/guide/integrations/wordpress-plugin" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-book" aria-hidden="true"></span><span><?php echo esc_html__( 'Setup guide', 'simply-send' ); ?></span><span class="dashicons dashicons-external" aria-hidden="true"></span></a>
 			</header>
 			<div class="ss-intro">
