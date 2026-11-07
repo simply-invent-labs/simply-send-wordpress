@@ -1,10 +1,10 @@
-=== Simply Send by Simply Invent Labs ===
+=== Simply Invent Labs — Simply Send ===
 Contributors: simplysend
 Tags: email, transactional email, api, deliverability, simply send
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.6
+Stable tag: 1.0.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -32,7 +32,7 @@ Simply Send replaces unreliable PHP `mail()` by routing `wp_mail` through the [S
 
 This plugin requires a Simply Send account, a transactional API key, and a verified transactional sending domain. Email usage is subject to your Simply Send plan; the plugin does not bill separately.
 
-After you configure and enable the plugin, each intercepted wp_mail call sends the sender and recipient addresses and names, subject, HTML and plain-text message bodies, Reply-To, supported CC/BCC recipients, and any supported attachments to https://tapi.simplysend.email/send over HTTPS. Your API key and Account ID are sent as authentication headers. Sending a test email makes the same request. Activation alone does not contact the service. No separate telemetry is collected by this plugin.
+After you configure and enable the plugin, each intercepted wp_mail call sends the sender and recipient addresses and names, subject, HTML and plain-text message bodies, Reply-To, supported CC/BCC recipients, and any supported attachments over HTTPS to the selected workspace region: https://tapi.simplysend.email/send (United States), https://au-tapi.simplysend.email/send (Australia), https://ca-tapi.simplysend.email/send (Canada), or https://eu-tapi.simplysend.email/send (Europe). Your API key and Account ID are sent as authentication headers. For emails with attachments estimated at 1.5 MiB or larger (including Base64 expansion and message overhead), the plugin first sends file names, types, sizes, and SHA-256 checksums to the selected region’s `/attachments` endpoint. It uploads file bytes to the returned short-lived HTTPS URLs in that region’s Amazon S3 storage, then sends the email with the returned attachment submission reference. API credentials are sent only to the Simply Send API, never to the upload URLs. Sending a test email makes a normal send request. Activation alone does not contact the service. No separate telemetry is collected by this plugin.
 
 Service: https://www.simplysend.email
 Terms of Service: https://www.simplysend.email/terms
@@ -44,13 +44,14 @@ Privacy Policy: https://www.simplysend.email/privacy
 * Attachments require exactly one To recipient, with no CC or BCC.
 * At most 10 readable local file attachments are supported. Unsupported messages fail before an API request; recipients and attachments are never silently dropped.
 * OpenSSL with AES-256-GCM is required to save an API key. Older stored keys must be re-entered after upgrading. Changing WordPress authentication salts also requires re-entering the key.
-* The API endpoint is fixed; custom API URLs are not supported.
+* Larger attachments are uploaded automatically above a 1.5 MiB estimated email cutoff. The service enforces your approved message-size limit, up to 40 MB including MIME overhead; this is not a 40 MB file allowance. PHP memory and execution limits can impose lower limits.
+* API endpoints are fixed per workspace region; custom API URLs and automatic cross-region fallback are not supported.
 
 == Installation ==
 
 1. After directory approval, install the plugin from Plugins → Add New. For review or manual installation, upload the official ZIP via Plugins → Add New → Upload Plugin.
-2. Activate **Simply Send by Simply Invent Labs**.
-3. In Simply Send, create a **transactional API key** and copy your **Account ID**.
+2. Activate **Simply Invent Labs — Simply Send**.
+3. Choose your workspace region in Settings → Simply Send, then use its dashboard links to create a **transactional API key** and copy your **Account ID**.
 4. Go to Settings → Simply Send in WordPress and paste the API key, Account ID, and From email.
 5. Enable Simply Send and send a test email.
 
@@ -82,5 +83,5 @@ For account setup, API credentials, or delivery questions, visit https://www.sim
 
 == Changelog ==
 
-= 1.0.6 =
+= 1.0.8 =
 * Initial release.

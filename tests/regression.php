@@ -19,7 +19,8 @@ function esc_html( $value ) { return htmlspecialchars( $value, ENT_QUOTES ); }
 function wp_strip_all_tags( $value ) { return strip_tags( $value ); }
 function wp_generate_uuid4() { return 'local-request-id'; }
 function wp_json_encode( $value ) { return json_encode( $value ); }
-function wp_remote_post( $url, $args ) { $GLOBALS['requests'][] = array( $url, $args ); return array( 'code' => $GLOBALS['response_code'] ?? 200, 'body' => '{"message":"Rejected"}' ); }
+function wp_remote_post( $url, $args ) { $GLOBALS['requests'][] = array( $url, $args ); if ( isset( $GLOBALS['http_mock'] ) ) { return call_user_func( $GLOBALS['http_mock'], $url, $args ); } return array( 'code' => $GLOBALS['response_code'] ?? 200, 'body' => '{"message":"Rejected"}' ); }
+function wp_safe_remote_request( $url, $args ) { $GLOBALS['requests'][] = array( $url, $args ); return $GLOBALS['upload_response'] ?? array( 'code' => 200, 'body' => '' ); }
 function is_wp_error( $value ) { return $value instanceof WP_Error; }
 function wp_remote_retrieve_response_code( $value ) { return $value['code']; }
 function wp_remote_retrieve_body( $value ) { return $value['body']; }
@@ -59,6 +60,33 @@ check( $settings['api_key'] === $saved['api_key'], 'blank key preserves encrypte
 $GLOBALS['options'][Simply_Send_Settings::OPTION_KEY] = $settings;
 $mailer = Simply_Send_Mailer::instance();
 $base = array( 'to' => 'recipient@example.com', 'subject' => 'Test', 'message' => 'Hello' );
+
+// Region routing must never trust a stored or submitted custom endpoint.
+$original_settings = $settings;
+foreach ( array( 'us' => 'https://tapi.simplysend.email/send', 'au' => 'https://au-tapi.simplysend.email/send', 'ca' => 'https://ca-tapi.simplysend.email/send', 'eu' => 'https://eu-tapi.simplysend.email/send' ) as $id => $endpoint ) {
+	$regional = Simply_Send_Settings::save( array( 'region' => $id, 'enabled' => 1, 'api_key' => 'regional-test-key', 'account_id' => 'regional-account', 'from_email' => 'sender@example.com' ) );
+	check( $id === Simply_Send_Settings::get()['region'] && $endpoint === Simply_Send_Settings::get()['api_url'], "$id region persists and reloads" );
+	$regional['api_url'] = 'https://untrusted.example/send';
+	$GLOBALS['requests'] = array();
+	check( $mailer->send_from_wp_mail( $base, $regional ), "$id region sends" );
+	check( $endpoint === $GLOBALS['requests'][0][0], "$id uses its allowlisted endpoint" );
+}
+$before = $GLOBALS['options'];
+foreach ( array( '', null, 'unknown', 'https://untrusted.example', array( 'au' ) ) as $bad_region ) {
+	check( false === Simply_Send_Settings::save( array( 'region' => $bad_region ) ), 'invalid region rejected on save' );
+	check( $before === $GLOBALS['options'], 'invalid region leaves settings unchanged' );
+	$invalid = array_merge( $original_settings, array( 'region' => $bad_region ) );
+	$GLOBALS['requests'] = array();
+	check( ! Simply_Send_Settings::is_ready( $invalid ), 'invalid region is not ready' );
+	check( false === $mailer->send_api( array(), $invalid ) && empty( $GLOBALS['requests'] ), 'invalid region makes no HTTP request' );
+}
+check( false === Simply_Send_Settings::save( array( 'region' => 'au', 'api_key' => '', 'account_id' => 'new-account' ) ), 'region switch requires a new key' );
+check( false === Simply_Send_Settings::save( array( 'region' => 'au', 'api_key' => 'new-key', 'account_id' => '' ) ), 'region switch requires an account ID' );
+check( $before === $GLOBALS['options'], 'incomplete region switch retains saved setup' );
+$kept = Simply_Send_Settings::save( array( 'region' => 'eu', 'api_key' => '', 'account_id' => 'regional-account' ) );
+check( $kept['api_key'] === $before[Simply_Send_Settings::OPTION_KEY]['api_key'], 'same-region blank key preserves encryption' );
+$GLOBALS['options'][Simply_Send_Settings::OPTION_KEY] = $original_settings;
+
 $markers = array( '{{company_address_html}}', '{{unsubscribe_email_html}}', '{{report_abuse_email_html}}' );
 for ( $mask = 0; $mask < 8; $mask++ ) {
 	$message = '<p>Original HTML</p>';

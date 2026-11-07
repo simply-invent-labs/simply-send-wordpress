@@ -11,6 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Simply_Send_Mailer {
 
+	const STAGED_THRESHOLD_BYTES = 1572864;
+	const MAX_MESSAGE_BYTES = 40000000;
+	const MAX_BODY_BYTES = 2097152;
+
 	/**
 	 * Singleton instance.
 	 *
@@ -71,7 +75,7 @@ class Simply_Send_Mailer {
 			return $return;
 		}
 		if ( ! Simply_Send_Settings::is_ready( $settings ) ) {
-			$this->last_error = __( 'Simply Send is enabled but its credentials are missing or cannot be decrypted securely. Re-enter the API key in Settings.', 'simply-send' );
+			$this->last_error = __( 'Simply Send is enabled but its credentials are missing or cannot be decrypted securely. Re-enter the API key in Settings.', 'simply-invent-labs-simply-send' );
 			do_action( 'wp_mail_failed', new WP_Error( 'simply_send_failed', $this->last_error ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Standard WordPress mail-failure hook.
 			return false;
 		}
@@ -110,13 +114,13 @@ class Simply_Send_Mailer {
 			: ( ! empty( $parsed['from_name'] ) ? $parsed['from_name'] : get_bloginfo( 'name' ) );
 
 		if ( empty( $from_email ) ) {
-			$this->last_error = __( 'From email is not configured.', 'simply-send' );
+			$this->last_error = __( 'From email is not configured.', 'simply-invent-labs-simply-send' );
 			return false;
 		}
 
 		$to_list = $this->normalize_addresses( $to );
 		if ( empty( $to_list ) && empty( $parsed['cc'] ) && empty( $parsed['bcc'] ) ) {
-			$this->last_error = __( 'No valid recipient address.', 'simply-send' );
+			$this->last_error = __( 'No valid recipient address.', 'simply-invent-labs-simply-send' );
 			return false;
 		}
 
@@ -135,7 +139,7 @@ class Simply_Send_Mailer {
 
 		// The public API supports either To/Cc or Bcc, never both.
 		if ( ! empty( $parsed['bcc'] ) && ( ! empty( $to_list ) || ! empty( $parsed['cc'] ) ) ) {
-			$this->last_error = __( 'Simply Send does not support BCC together with To or CC. No email was sent.', 'simply-send' );
+			$this->last_error = __( 'Simply Send does not support BCC together with To or CC. No email was sent.', 'simply-invent-labs-simply-send' );
 			return false;
 		}
 		foreach ( array( 'to' => $to_list, 'cc' => $parsed['cc'], 'bcc' => $parsed['bcc'] ) as $field => $addresses ) {
@@ -148,18 +152,42 @@ class Simply_Send_Mailer {
 			$payload['replyTo'] = $parsed['reply_to'];
 		}
 
-		$attachments = $this->build_attachments( $files );
+		$attachments = $this->inspect_attachments( $files );
 		if ( false === $attachments ) {
+			return false;
+		}
+		$body_json = wp_json_encode( $payload );
+		if ( false === $body_json || strlen( $body_json ) > self::MAX_BODY_BYTES ) {
+			$this->last_error = __( 'Email body and metadata must be 2 MiB or smaller. No email was sent.', 'simply-invent-labs-simply-send' );
 			return false;
 		}
 		if ( ! empty( $attachments ) ) {
 			if ( 1 !== count( $to_list ) || ! empty( $parsed['cc'] ) || ! empty( $parsed['bcc'] ) ) {
-				$this->last_error = __( 'Attachments require exactly one To recipient and no CC or BCC. No email was sent.', 'simply-send' );
+				$this->last_error = __( 'Attachments require exactly one To recipient and no CC or BCC. No email was sent.', 'simply-invent-labs-simply-send' );
 				return false;
 			}
-			$payload['attachments'] = $attachments;
+			// Include Base64 expansion, line breaks, and conservative MIME overhead.
+			$estimated_bytes = strlen( $body_json ) + 16384;
+			foreach ( $attachments as $attachment ) {
+				$encoded = 4 * (int) ceil( $attachment['sizeBytes'] / 3 );
+				$estimated_bytes += $encoded + 2 * (int) ceil( $encoded / 76 ) + 2048;
+			}
+			if ( $estimated_bytes > self::MAX_MESSAGE_BYTES ) {
+				$this->last_error = __( 'The estimated email size exceeds the 40 MB maximum. Reduce the attachments.', 'simply-invent-labs-simply-send' );
+				return false;
+			}
+			if ( $estimated_bytes >= self::STAGED_THRESHOLD_BYTES ) {
+				return $this->send_staged( $payload, $attachments, $settings );
+			}
+			$payload['attachments'] = array();
+			foreach ( $attachments as $attachment ) {
+				$content = $this->read_attachment( $attachment );
+				if ( false === $content ) {
+					return false;
+				}
+				$payload['attachments'][] = array( 'name' => $attachment['name'], 'contentType' => $attachment['contentType'], 'content' => base64_encode( $content ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+			}
 		}
-
 		return $this->send_api( $payload, $settings );
 	}
 
@@ -168,26 +196,45 @@ class Simply_Send_Mailer {
 	 *
 	 * @param array<string, mixed> $payload  JSON body.
 	 * @param array<string, mixed> $settings Settings.
+	 * @param string|null $idempotency_key Optional key shared with attachment authorization.
 	 * @return bool
 	 */
-	public function send_api( $payload, $settings = null ) {
+	public function send_api( $payload, $settings = null, $idempotency_key = null ) {
+		return false !== $this->request_api( 'send', $payload, $settings, $idempotency_key ? $idempotency_key : wp_generate_uuid4() );
+	}
+
+	/**
+	 * Send an authenticated request to a fixed regional API endpoint.
+	 *
+	 * @param string               $endpoint Endpoint suffix.
+	 * @param array<string, mixed> $payload JSON body.
+	 * @param array<string, mixed> $settings Settings.
+	 * @param string               $idempotency_key Shared logical-send key.
+	 * @return array<string, mixed>|false
+	 */
+	private function request_api( $endpoint, $payload, $settings, $idempotency_key ) {
 		$settings = $settings ? $settings : Simply_Send_Settings::get();
 		$api_key  = Simply_Send_Settings::get_api_key( $settings );
 
 		if ( empty( $api_key ) || empty( $settings['account_id'] ) ) {
-			$this->last_error = __( 'API key or Account ID is missing.', 'simply-send' );
+			$this->last_error = __( 'API key or Account ID is missing.', 'simply-invent-labs-simply-send' );
 			return false;
 		}
 
-		$url = Simply_Send_Settings::API_URL;
+		$url = Simply_Send_Settings::api_url( $settings );
+		if ( '' === $url ) {
+			$this->last_error = __( 'Choose a supported workspace region before sending email.', 'simply-invent-labs-simply-send' );
+			return false;
+		}
 
 		$headers = array(
 			'Content-Type' => 'application/json',
 			'X-Api-Key'    => $api_key,
 			'X-Id'         => $settings['account_id'],
-			'Idempotency-Key' => wp_generate_uuid4(),
+			'Idempotency-Key' => $idempotency_key,
 		);
 
+		$url = preg_replace( '~/send$~', '/' . $endpoint, $url );
 		$response = wp_remote_post(
 			$url,
 			array(
@@ -209,7 +256,7 @@ class Simply_Send_Mailer {
 		$data = json_decode( $body, true );
 
 		if ( $code >= 200 && $code < 300 ) {
-			return true;
+			return is_array( $data ) ? $data : array();
 		}
 
 		$message = '';
@@ -223,7 +270,7 @@ class Simply_Send_Mailer {
 		if ( '' === $message ) {
 			$message = sprintf(
 				/* translators: %d: HTTP status code */
-				__( 'Simply Send API error (HTTP %d).', 'simply-send' ),
+				__( 'Simply Send API error (HTTP %d).', 'simply-invent-labs-simply-send' ),
 				$code
 			);
 		}
@@ -392,47 +439,121 @@ class Simply_Send_Mailer {
 	}
 
 	/**
-	 * Convert file-path attachments to API payload objects.
+	 * Inspect local files without loading their contents into PHP memory.
 	 *
 	 * @param mixed $files Attachment paths.
-	 * @return array<int, array<string, string>>|false
+	 * @return array<int, array<string, mixed>>|false
 	 */
-	private function build_attachments( $files ) {
+	private function inspect_attachments( $files ) {
 		if ( empty( $files ) ) {
 			return array();
 		}
 		if ( ! is_array( $files ) ) {
 			$files = explode( "\n", str_replace( "\r\n", "\n", (string) $files ) );
 		}
-
 		if ( count( $files ) > 10 ) {
-			$this->last_error = __( 'Simply Send supports at most 10 attachments. No email was sent.', 'simply-send' );
+			$this->last_error = __( 'Simply Send supports at most 10 attachments. No email was sent.', 'simply-invent-labs-simply-send' );
 			return false;
 		}
-
 		$out = array();
 		foreach ( $files as $path ) {
-			$path = (string) $path;
-			if ( '' === $path || false !== strpos( $path, '://' ) || ! is_file( $path ) || ! is_readable( $path ) ) {
-				$this->last_error = __( 'An attachment is not a readable local file. No email was sent.', 'simply-send' );
+			if ( ! is_string( $path ) || '' === $path || false !== strpos( $path, '://' ) || ! is_file( $path ) || ! is_readable( $path ) ) {
+				$this->last_error = __( 'An attachment is not a readable local file. No email was sent.', 'simply-invent-labs-simply-send' );
 				return false;
 			}
-			$contents = @file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-			if ( false === $contents ) {
-				$this->last_error = __( 'An attachment could not be read. No email was sent.', 'simply-send' );
+			clearstatcache( true, $path );
+			$size = filesize( $path );
+			if ( false === $size || $size > self::MAX_MESSAGE_BYTES ) {
+				$this->last_error = __( 'An attachment exceeds the 40 MB maximum or its size could not be read.', 'simply-invent-labs-simply-send' );
 				return false;
 			}
-			$name = basename( $path );
+			$hash = hash_file( 'sha256', $path );
+			if ( false === $hash ) {
+				$this->last_error = __( 'An attachment could not be read. No email was sent.', 'simply-invent-labs-simply-send' );
+				return false;
+			}
 			$type = function_exists( 'mime_content_type' ) ? mime_content_type( $path ) : 'application/octet-stream';
-			if ( ! $type ) {
-				$type = 'application/octet-stream';
-			}
-			$out[] = array(
-				'name'        => $name,
-				'contentType' => $type,
-				'content'     => base64_encode( $contents ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-			);
+			$out[] = array( 'path' => $path, 'name' => basename( $path ), 'contentType' => $type ? $type : 'application/octet-stream', 'sizeBytes' => $size, 'sha256' => $hash );
 		}
 		return $out;
+	}
+
+	/**
+	 * Read one bounded file, allowing for HTTP transport copies in PHP memory.
+	 *
+	 * @param array<string, mixed> $attachment Inspected file.
+	 * @return string|false
+	 */
+	private function read_attachment( $attachment ) {
+		$limit = trim( ini_get( 'memory_limit' ) );
+		$bytes = (int) $limit;
+		$unit = strtolower( substr( $limit, -1 ) );
+		foreach ( array( 'g' => 1073741824, 'm' => 1048576, 'k' => 1024 ) as $suffix => $factor ) {
+			if ( $unit === $suffix ) { $bytes *= $factor; }
+		}
+		if ( $bytes > 0 && memory_get_usage( true ) + 3 * $attachment['sizeBytes'] + 16777216 > $bytes ) {
+			$this->last_error = __( 'PHP has insufficient memory to safely upload this attachment. Reduce the file size or ask your host to increase the PHP memory limit.', 'simply-invent-labs-simply-send' );
+			return false;
+		}
+		// Read at most the inspected size plus one byte to detect changed files.
+		$content = @file_get_contents( $attachment['path'], false, null, 0, $attachment['sizeBytes'] + 1 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $content || strlen( $content ) !== $attachment['sizeBytes'] || ! hash_equals( $attachment['sha256'], hash( 'sha256', $content ) ) ) {
+			$this->last_error = __( 'An attachment changed or could not be read. No email was sent.', 'simply-invent-labs-simply-send' );
+			return false;
+		}
+		return $content;
+	}
+
+	/**
+	 * Authorize attachment uploads, PUT files, then submit the original email.
+	 *
+	 * @param array<string, mixed> $payload Email fields.
+	 * @param array<int, array<string, mixed>> $attachments Inspected files.
+	 * @param array<string, mixed> $settings Settings.
+	 * @return bool
+	 */
+	private function send_staged( $payload, $attachments, $settings ) {
+		$idempotency_key = wp_generate_uuid4();
+		$manifest = array();
+		foreach ( $attachments as $attachment ) {
+			$file = $attachment;
+			unset( $file['path'] );
+			$manifest[] = $file;
+		}
+		$response = $this->request_api( 'attachments', array( 'attachments' => $manifest ), $settings, $idempotency_key );
+		if ( false === $response ) { return false; }
+		$data = isset( $response['data'] ) && is_array( $response['data'] ) ? $response['data'] : array();
+		if ( isset( $data['recipients'] ) && is_array( $data['recipients'] ) ) { return true; }
+		if ( empty( $data['attachmentSubmissionId'] ) || ! is_string( $data['attachmentSubmissionId'] ) || ! preg_match( '/^sub_[a-f0-9]{32}$/', $data['attachmentSubmissionId'] ) || ! isset( $data['attachmentUploads'] ) || ! is_array( $data['attachmentUploads'] ) || count( $data['attachmentUploads'] ) !== count( $attachments ) ) {
+			$this->last_error = __( 'Attachment authorization returned an invalid upload manifest. No email was sent.', 'simply-invent-labs-simply-send' );
+			return false;
+		}
+		$aws_regions = array( 'us' => 'us-east-1', 'au' => 'ap-southeast-2', 'ca' => 'ca-central-1', 'eu' => 'eu-central-1' );
+		$aws_region = $aws_regions[ isset( $settings['region'] ) ? $settings['region'] : 'us' ];
+		// Validate the entire response before any file bytes leave the site.
+		foreach ( $attachments as $index => $attachment ) {
+			$upload = isset( $data['attachmentUploads'][ $index ] ) ? $data['attachmentUploads'][ $index ] : array();
+			$url = isset( $upload['uploadUrl'] ) && is_string( $upload['uploadUrl'] ) ? parse_url( $upload['uploadUrl'] ) : false;
+			$headers = isset( $upload['requiredHeaders'] ) && is_array( $upload['requiredHeaders'] ) ? $upload['requiredHeaders'] : array();
+			$checksum = base64_encode( hex2bin( $attachment['sha256'] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+			if ( ! $url || ! isset( $url['scheme'], $url['host'] ) || 'https' !== $url['scheme'] || ! preg_match( '/^[a-z0-9][a-z0-9.-]*\.s3\.' . preg_quote( $aws_region, '/' ) . '\.amazonaws\.com$/', $url['host'] ) || isset( $url['port'] ) || isset( $url['user'] ) || isset( $url['pass'] ) || isset( $url['fragment'] ) || ! isset( $upload['index'] ) || $index !== $upload['index'] || count( $headers ) !== 2 || ! isset( $headers['Content-Length'], $headers['x-amz-checksum-sha256'] ) || ! is_string( $headers['Content-Length'] ) || (string) $attachment['sizeBytes'] !== $headers['Content-Length'] || $checksum !== $headers['x-amz-checksum-sha256'] ) {
+				$this->last_error = __( 'Attachment authorization returned an unsafe or mismatched upload manifest. No email was sent.', 'simply-invent-labs-simply-send' );
+				return false;
+			}
+		}
+		foreach ( $attachments as $index => $attachment ) {
+			$upload = $data['attachmentUploads'][ $index ];
+			$content = $this->read_attachment( $attachment );
+			if ( false === $content ) { return false; }
+			// Signed upload URLs are temporary credentials. Never forward API headers or expose URLs in errors.
+			$result = wp_safe_remote_request( $upload['uploadUrl'], array( 'method' => 'PUT', 'timeout' => 120, 'redirection' => 0, 'sslverify' => true, 'headers' => $upload['requiredHeaders'], 'body' => $content, 'limit_response_size' => 4096 ) );
+			unset( $content );
+			if ( is_wp_error( $result ) || wp_remote_retrieve_response_code( $result ) < 200 || wp_remote_retrieve_response_code( $result ) >= 300 ) {
+				$this->last_error = __( 'An attachment upload failed. No email was sent. Retry the email or contact support if the problem persists.', 'simply-invent-labs-simply-send' );
+				return false;
+			}
+		}
+		$payload['attachmentSubmissionId'] = $data['attachmentSubmissionId'];
+		return $this->send_api( $payload, $settings, $idempotency_key );
 	}
 }

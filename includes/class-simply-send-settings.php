@@ -14,6 +14,33 @@ class Simply_Send_Settings {
 	const OPTION_KEY = 'simply_send_settings';
 	const API_URL = 'https://tapi.simplysend.email/send';
 
+
+	/**
+	 * Supported workspace regions. Endpoints are fixed to prevent credential leakage.
+	 *
+	 * @return array<string, array<string, string>>
+	 */
+	public static function regions() {
+		return array(
+			'us' => array( 'country' => __( 'United States', 'simply-invent-labs-simply-send' ), 'location' => __( 'East', 'simply-invent-labs-simply-send' ), 'flag' => '🇺🇸', 'label' => __( 'United States (East)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://app.simplysend.email', 'api_url' => self::API_URL ),
+			'au' => array( 'country' => __( 'Australia', 'simply-invent-labs-simply-send' ), 'location' => __( 'Sydney', 'simply-invent-labs-simply-send' ), 'flag' => '🇦🇺', 'label' => __( 'Australia (Sydney)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://au-app.simplysend.email', 'api_url' => 'https://au-tapi.simplysend.email/send' ),
+			'ca' => array( 'country' => __( 'Canada', 'simply-invent-labs-simply-send' ), 'location' => __( 'Central', 'simply-invent-labs-simply-send' ), 'flag' => '🇨🇦', 'label' => __( 'Canada (Central)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://ca-app.simplysend.email', 'api_url' => 'https://ca-tapi.simplysend.email/send' ),
+			'eu' => array( 'country' => __( 'Europe', 'simply-invent-labs-simply-send' ), 'location' => __( 'Frankfurt, Germany', 'simply-invent-labs-simply-send' ), 'flag' => '🇪🇺', 'label' => __( 'Europe (Frankfurt)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://eu-app.simplysend.email', 'api_url' => 'https://eu-tapi.simplysend.email/send' ),
+		);
+	}
+
+	/**
+	 * Resolve only an allowlisted regional endpoint; invalid regions fail closed.
+	 *
+	 * @param array<string, mixed> $settings Settings.
+	 * @return string
+	 */
+	public static function api_url( $settings ) {
+		$regions = self::regions();
+		$region  = array_key_exists( 'region', $settings ) ? $settings['region'] : 'us';
+		return is_string( $region ) && isset( $regions[ $region ] ) ? $regions[ $region ]['api_url'] : '';
+	}
+
 	/**
 	 * Default settings.
 	 *
@@ -21,6 +48,7 @@ class Simply_Send_Settings {
 	 */
 	public static function defaults() {
 		return array(
+			'region'     => 'us',
 			'enabled'    => false,
 			'api_key'    => '',
 			'account_id' => '',
@@ -41,7 +69,13 @@ class Simply_Send_Settings {
 		if ( ! is_array( $stored ) ) {
 			$stored = array();
 		}
-		return array_merge( self::defaults(), $stored );
+		$settings = array_merge( self::defaults(), $stored );
+		$settings['api_url'] = self::api_url( $settings );
+		$settings['account_id'] = is_string( $settings['account_id'] ) ? strtoupper( trim( $settings['account_id'] ) ) : '';
+		if ( ! is_string( $settings['region'] ) ) {
+			$settings['region'] = '';
+		}
+		return $settings;
 	}
 
 	/**
@@ -52,11 +86,22 @@ class Simply_Send_Settings {
 	 */
 	public static function save( $input ) {
 		$current = self::get();
+		$region  = array_key_exists( 'region', $input ) ? $input['region'] : $current['region'];
+		$regions = self::regions();
+		if ( ! is_string( $region ) || ! isset( $regions[ $region ] ) ) {
+			add_settings_error( 'simply_send', 'simply_send_region', __( 'Choose a supported workspace region. Settings were not saved.', 'simply-invent-labs-simply-send' ), 'error' );
+			return false;
+		}
+		if ( $region !== $current['region'] && ( empty( $input['api_key'] ) || ! is_string( $input['api_key'] ) || '' === trim( $input['api_key'] ) || empty( $input['account_id'] ) || ! is_string( $input['account_id'] ) || '' === trim( $input['account_id'] ) ) ) {
+			add_settings_error( 'simply_send', 'simply_send_region_credentials', __( 'Enter the transactional API key and Account ID for the selected region before saving.', 'simply-invent-labs-simply-send' ), 'error' );
+			return false;
+		}
 
 		$settings = array(
+			'region'     => $region,
 			'enabled'    => ! empty( $input['enabled'] ),
-			'account_id' => isset( $input['account_id'] ) ? sanitize_text_field( $input['account_id'] ) : '',
-			'api_url'    => self::API_URL,
+			'account_id' => isset( $input['account_id'] ) ? strtoupper( sanitize_text_field( $input['account_id'] ) ) : '',
+			'api_url'    => $regions[ $region ]['api_url'],
 			'from_email' => isset( $input['from_email'] ) ? sanitize_email( $input['from_email'] ) : '',
 			'from_name'  => isset( $input['from_name'] ) ? sanitize_text_field( $input['from_name'] ) : '',
 			'force_from' => ! empty( $input['force_from'] ),
@@ -65,7 +110,7 @@ class Simply_Send_Settings {
 		if ( isset( $input['api_key'] ) && '' !== (string) $input['api_key'] ) {
 			$encrypted = self::encrypt( sanitize_text_field( (string) $input['api_key'] ) );
 			if ( false === $encrypted ) {
-				add_settings_error( 'simply_send', 'simply_send_encryption', __( 'Secure API key storage requires OpenSSL with AES-256-GCM. Settings were not saved.', 'simply-send' ), 'error' );
+				add_settings_error( 'simply_send', 'simply_send_encryption', __( 'Secure API key storage requires OpenSSL with AES-256-GCM. Settings were not saved.', 'simply-invent-labs-simply-send' ), 'error' );
 				return false;
 			}
 			$settings['api_key'] = $encrypted;
@@ -86,7 +131,8 @@ class Simply_Send_Settings {
 	 */
 	public static function is_ready( $settings = null ) {
 		$s = $settings ? $settings : self::get();
-		return ! empty( $s['enabled'] )
+		return '' !== self::api_url( $s )
+			&& ! empty( $s['enabled'] )
 			&& '' !== self::get_api_key( $s )
 			&& ! empty( $s['account_id'] )
 			&& ! empty( $s['from_email'] );

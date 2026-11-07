@@ -1,4 +1,4 @@
-# Simply Send by Simply Invent Labs
+# Simply Invent Labs — Simply Send
 
 Official WordPress plugin for [Simply Send](https://www.simplysend.email). Intercepts `wp_mail` and sends through the **transactional HTTP API**.
 
@@ -16,14 +16,14 @@ Official WordPress plugin for [Simply Send](https://www.simplysend.email). Inter
 From this repository root:
 
 ```bash
-mkdir -p dist/simply-send/assets
-cp simply-send.php uninstall.php readme.txt dist/simply-send/
-cp -R includes dist/simply-send/
-cp -R assets/. dist/simply-send/assets/
-cd dist && zip -r simply-send-1.0.6.zip simply-send
+mkdir -p dist/simply-invent-labs-simply-send/assets
+cp simply-send.php uninstall.php readme.txt dist/simply-invent-labs-simply-send/
+cp -R includes dist/simply-invent-labs-simply-send/
+cp -R assets/. dist/simply-invent-labs-simply-send/assets/
+cd dist && zip -r simply-invent-labs-simply-send-1.0.8.zip simply-invent-labs-simply-send
 ```
 
-Upload `simply-send-1.0.6.zip` in WordPress: **Plugins → Add New → Upload Plugin**.
+Upload `simply-invent-labs-simply-send-1.0.8.zip` in WordPress: **Plugins → Add New → Upload Plugin**.
 
 ## Configure
 
@@ -44,7 +44,9 @@ Docs: https://www.simplysend.email/docs/guide/integrations/wordpress-plugin
 
 ## Delivery limits and upgrades
 
-The API endpoint is fixed to HTTPS and redirects are disabled. Custom endpoints are no longer supported. Previously stored API keys must be re-entered after upgrading to authenticated encryption; changing WordPress authentication salts also requires re-entering the key. An enabled plugin with unavailable credentials fails rather than silently falling back to PHP mail.
+The API endpoint is fixed to HTTPS for the selected workspace region (US, Australia, Canada, or Europe), and redirects are disabled. Changing regions requires entering the selected region’s API key and Account ID. Custom endpoints are no longer supported. Previously stored API keys must be re-entered after upgrading to authenticated encryption; changing WordPress authentication salts also requires re-entering the key. An enabled plugin with unavailable credentials fails rather than silently falling back to PHP mail.
+
+Messages with attachments estimated at 1.5 MiB or larger use regional `POST /attachments`, checksum-verified signed HTTPS uploads, and `POST /send` with `attachmentSubmissionId`. Authorization and send share one idempotency key. Small attachments remain inline. The backend enforces approved workspace limits up to 40 MB of final MIME; local size estimates and PHP memory checks can reject earlier.
 
 Use either To/CC or BCC, not both. Attachments require exactly one To recipient, no CC/BCC, and at most 10 readable local files. Unsupported combinations fail before the API request without dropping recipients or attachments. Failures from intercepted mail trigger `wp_mail_failed`.
 
@@ -53,7 +55,7 @@ Use either To/CC or BCC, not both. Attachments require exactly one To recipient,
 These tests stub WordPress functions and HTTP requests; they do not send email:
 
 ```bash
-php tests/regression.php
+php tests/attachments.php
 php -d disable_functions=openssl_encrypt,openssl_decrypt,openssl_get_cipher_methods tests/regression.php --no-openssl
 ```
 

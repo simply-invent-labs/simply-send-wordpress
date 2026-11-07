@@ -1,23 +1,23 @@
 <?php
 /**
- * Plugin Name:       Simply Send by Simply Invent Labs
+ * Plugin Name:       Simply Invent Labs — Simply Send
  * Plugin URI:        https://www.simplysend.email/integrations/wordpress
  * Description:       Send WordPress email through the Simply Send transactional API — contact forms, notifications, and plugin mail from your verified domain.
- * Version:           1.0.6
+ * Version:           1.0.8
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Simply Invent Labs
  * Author URI:        https://simplyinventlabs.com
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       simply-send
+ * Text Domain:       simply-invent-labs-simply-send
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SIMPLY_SEND_VERSION', '1.0.6' );
+define( 'SIMPLY_SEND_VERSION', '1.0.8' );
 define( 'SIMPLY_SEND_PLUGIN_FILE', __FILE__ );
 define( 'SIMPLY_SEND_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SIMPLY_SEND_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
