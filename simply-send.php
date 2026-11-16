@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       Simply Invent Labs — Simply Send
- * Plugin URI:        https://www.simplysend.email/integrations/wordpress
+ * Plugin URI:        https://www.simplysend.dev/integrations/wordpress
  * Description:       Send WordPress email through the Simply Send transactional API — contact forms, notifications, and plugin mail from your verified domain.
  * Version:           1.0.8
  * Requires at least: 5.8

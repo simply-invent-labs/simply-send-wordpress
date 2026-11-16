@@ -19,6 +19,9 @@ function esc_html( $value ) { return htmlspecialchars( $value, ENT_QUOTES ); }
 function wp_strip_all_tags( $value ) { return strip_tags( $value ); }
 function wp_generate_uuid4() { return 'local-request-id'; }
 function wp_json_encode( $value ) { return json_encode( $value ); }
+if ( ! function_exists( 'wp_parse_url' ) ) {
+	function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
+}
 function wp_remote_post( $url, $args ) { $GLOBALS['requests'][] = array( $url, $args ); if ( isset( $GLOBALS['http_mock'] ) ) { return call_user_func( $GLOBALS['http_mock'], $url, $args ); } return array( 'code' => $GLOBALS['response_code'] ?? 200, 'body' => '{"message":"Rejected"}' ); }
 function wp_safe_remote_request( $url, $args ) { $GLOBALS['requests'][] = array( $url, $args ); return $GLOBALS['upload_response'] ?? array( 'code' => 200, 'body' => '' ); }
 function is_wp_error( $value ) { return $value instanceof WP_Error; }
@@ -63,7 +66,7 @@ $base = array( 'to' => 'recipient@example.com', 'subject' => 'Test', 'message' =
 
 // Region routing must never trust a stored or submitted custom endpoint.
 $original_settings = $settings;
-foreach ( array( 'us' => 'https://tapi.simplysend.email/send', 'au' => 'https://au-tapi.simplysend.email/send', 'ca' => 'https://ca-tapi.simplysend.email/send', 'eu' => 'https://eu-tapi.simplysend.email/send' ) as $id => $endpoint ) {
+foreach ( array( 'us' => 'https://tapi.simplysend.dev/send', 'au' => 'https://au-tapi.simplysend.dev/send', 'ca' => 'https://ca-tapi.simplysend.dev/send', 'eu' => 'https://eu-tapi.simplysend.dev/send' ) as $id => $endpoint ) {
 	$regional = Simply_Send_Settings::save( array( 'region' => $id, 'enabled' => 1, 'api_key' => 'regional-test-key', 'account_id' => 'regional-account', 'from_email' => 'sender@example.com' ) );
 	check( $id === Simply_Send_Settings::get()['region'] && $endpoint === Simply_Send_Settings::get()['api_url'], "$id region persists and reloads" );
 	$regional['api_url'] = 'https://untrusted.example/send';

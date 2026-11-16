@@ -29,7 +29,7 @@ try {
 		check( $mailer->send_from_wp_mail( $large_atts, $settings ), "$site large attachment sends" );
 		$requests = $GLOBALS['requests'];
 		check( 3 === count( $requests ), "$site authorizes, uploads, and sends" );
-		$expected = 'https://' . ( 'us' === $site ? '' : $site . '-' ) . 'tapi.simplysend.email/';
+		$expected = 'https://' . ( 'us' === $site ? '' : $site . '-' ) . 'tapi.simplysend.dev/';
 		check( $expected . 'attachments' === $requests[0][0] && $expected . 'send' === $requests[2][0], "$site API requests stay in selected region" );
 		$manifest = json_decode( $requests[0][1]['body'], true );
 		check( array( 'attachments' ) === array_keys( $manifest ) && 1200000 === $manifest['attachments'][0]['sizeBytes'] && hash_file( 'sha256', $large_file ) === $manifest['attachments'][0]['sha256'], 'authorization contains only metadata and checksum' );

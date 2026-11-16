@@ -533,7 +533,7 @@ class Simply_Send_Mailer {
 		// Validate the entire response before any file bytes leave the site.
 		foreach ( $attachments as $index => $attachment ) {
 			$upload = isset( $data['attachmentUploads'][ $index ] ) ? $data['attachmentUploads'][ $index ] : array();
-			$url = isset( $upload['uploadUrl'] ) && is_string( $upload['uploadUrl'] ) ? parse_url( $upload['uploadUrl'] ) : false;
+			$url = isset( $upload['uploadUrl'] ) && is_string( $upload['uploadUrl'] ) ? wp_parse_url( $upload['uploadUrl'] ) : false;
 			$headers = isset( $upload['requiredHeaders'] ) && is_array( $upload['requiredHeaders'] ) ? $upload['requiredHeaders'] : array();
 			$checksum = base64_encode( hex2bin( $attachment['sha256'] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 			if ( ! $url || ! isset( $url['scheme'], $url['host'] ) || 'https' !== $url['scheme'] || ! preg_match( '/^[a-z0-9][a-z0-9.-]*\.s3\.' . preg_quote( $aws_region, '/' ) . '\.amazonaws\.com$/', $url['host'] ) || isset( $url['port'] ) || isset( $url['user'] ) || isset( $url['pass'] ) || isset( $url['fragment'] ) || ! isset( $upload['index'] ) || $index !== $upload['index'] || count( $headers ) !== 2 || ! isset( $headers['Content-Length'], $headers['x-amz-checksum-sha256'] ) || ! is_string( $headers['Content-Length'] ) || (string) $attachment['sizeBytes'] !== $headers['Content-Length'] || $checksum !== $headers['x-amz-checksum-sha256'] ) {

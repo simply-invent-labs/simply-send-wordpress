@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Simply_Send_Settings {
 
 	const OPTION_KEY = 'simply_send_settings';
-	const API_URL = 'https://tapi.simplysend.email/send';
+	const API_URL = 'https://tapi.simplysend.dev/send';
 
 
 	/**
@@ -22,10 +22,10 @@ class Simply_Send_Settings {
 	 */
 	public static function regions() {
 		return array(
-			'us' => array( 'country' => __( 'United States', 'simply-invent-labs-simply-send' ), 'location' => __( 'East', 'simply-invent-labs-simply-send' ), 'flag' => '🇺🇸', 'label' => __( 'United States (East)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://app.simplysend.email', 'api_url' => self::API_URL ),
-			'au' => array( 'country' => __( 'Australia', 'simply-invent-labs-simply-send' ), 'location' => __( 'Sydney', 'simply-invent-labs-simply-send' ), 'flag' => '🇦🇺', 'label' => __( 'Australia (Sydney)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://au-app.simplysend.email', 'api_url' => 'https://au-tapi.simplysend.email/send' ),
-			'ca' => array( 'country' => __( 'Canada', 'simply-invent-labs-simply-send' ), 'location' => __( 'Central', 'simply-invent-labs-simply-send' ), 'flag' => '🇨🇦', 'label' => __( 'Canada (Central)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://ca-app.simplysend.email', 'api_url' => 'https://ca-tapi.simplysend.email/send' ),
-			'eu' => array( 'country' => __( 'Europe', 'simply-invent-labs-simply-send' ), 'location' => __( 'Frankfurt, Germany', 'simply-invent-labs-simply-send' ), 'flag' => '🇪🇺', 'label' => __( 'Europe (Frankfurt)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://eu-app.simplysend.email', 'api_url' => 'https://eu-tapi.simplysend.email/send' ),
+			'us' => array( 'country' => __( 'United States', 'simply-invent-labs-simply-send' ), 'location' => __( 'East', 'simply-invent-labs-simply-send' ), 'flag' => '🇺🇸', 'label' => __( 'United States (East)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://app.simplysend.dev', 'api_url' => self::API_URL ),
+			'au' => array( 'country' => __( 'Australia', 'simply-invent-labs-simply-send' ), 'location' => __( 'Sydney', 'simply-invent-labs-simply-send' ), 'flag' => '🇦🇺', 'label' => __( 'Australia (Sydney)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://au-app.simplysend.dev', 'api_url' => 'https://au-tapi.simplysend.dev/send' ),
+			'ca' => array( 'country' => __( 'Canada', 'simply-invent-labs-simply-send' ), 'location' => __( 'Central', 'simply-invent-labs-simply-send' ), 'flag' => '🇨🇦', 'label' => __( 'Canada (Central)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://ca-app.simplysend.dev', 'api_url' => 'https://ca-tapi.simplysend.dev/send' ),
+			'eu' => array( 'country' => __( 'Europe', 'simply-invent-labs-simply-send' ), 'location' => __( 'Frankfurt, Germany', 'simply-invent-labs-simply-send' ), 'flag' => '🇪🇺', 'label' => __( 'Europe (Frankfurt)', 'simply-invent-labs-simply-send' ), 'portal' => 'https://eu-app.simplysend.dev', 'api_url' => 'https://eu-tapi.simplysend.dev/send' ),
 		);
 	}
 

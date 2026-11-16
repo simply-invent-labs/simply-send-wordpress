@@ -1,10 +1,10 @@
 # Simply Invent Labs — Simply Send
 
-Official WordPress plugin for [Simply Send](https://www.simplysend.email). Intercepts `wp_mail` and sends through the **transactional HTTP API**.
+Official WordPress plugin for [Simply Send](https://www.simplysend.dev). Intercepts `wp_mail` and sends through the **transactional HTTP API**.
 
 ## Features
 
-- `pre_wp_mail` interception → `POST https://tapi.simplysend.email/send`
+- `pre_wp_mail` interception → `POST https://tapi.simplysend.dev/send`
 - Settings under **Settings → Simply Send**
 - Authenticated API key encryption (OpenSSL AES-256-GCM + WordPress salts required)
 - Force From address on a verified domain
@@ -27,14 +27,14 @@ Upload `simply-invent-labs-simply-send-1.0.8.zip` in WordPress: **Plugins → Ad
 
 ## Configure
 
-1. Create a **transactional API key** at https://app.simplysend.email/api-keys
-2. Copy your **Account ID** from https://app.simplysend.email/account
+1. Create a **transactional API key** at https://app.simplysend.dev/api-keys
+2. Copy your **Account ID** from https://app.simplysend.dev/account
 3. In WordPress → **Settings → Simply Send**, paste API key, Account ID, and From email
 4. Enable and send a test email
 
 Billing for sends is on the Simply Send workspace plan — not in WordPress.
 
-Docs: https://www.simplysend.email/docs/guide/integrations/wordpress-plugin
+Docs: https://www.simplysend.dev/docs/guide/integrations/wordpress-plugin
 
 ## Requirements
 
@@ -50,11 +50,47 @@ Messages with attachments estimated at 1.5 MiB or larger use regional `POST /att
 
 Use either To/CC or BCC, not both. Attachments require exactly one To recipient, no CC/BCC, and at most 10 readable local files. Unsupported combinations fail before the API request without dropping recipients or attachments. Failures from intercepted mail trigger `wp_mail_failed`.
 
+## Development and contributing
+
+Contributions are welcome. Please open a GitHub issue before starting a substantial feature so the scope and approach can be discussed. Small bug fixes and documentation improvements can go directly into a pull request.
+
+### Repository layout
+
+- `simply-send.php`: plugin metadata, constants, and startup hooks.
+- `includes/class-simply-send-settings.php`: settings, supported regions, fixed API endpoints, and encrypted API-key storage.
+- `includes/class-simply-send-mailer.php`: `wp_mail` handling, API requests, and attachment processing.
+- `includes/class-simply-send-admin.php`: WordPress admin screens and actions.
+- `assets/`: settings-page styles, JavaScript, and plugin images.
+- `tests/`: PHP regression checks that stub WordPress functions and mock HTTP requests.
+- `readme.txt`: WordPress.org listing content, setup instructions, and external-service disclosures.
+
+### Make a change
+
+1. Clone this repository and create a focused branch for your change:
+
+   ```bash
+   git clone https://github.com/simply-invent-labs/simply-send-wordpress.git
+   cd simply-send-wordpress
+   git switch -c your-change-name
+   ```
+
+2. Make the smallest focused change that solves the issue. Keep user-facing strings translation-ready and follow the formatting of the surrounding PHP, JavaScript, and CSS.
+3. Run the relevant local regression checks below. They use mocked WordPress and HTTP behavior; they do not send email.
+4. Open a pull request describing the problem, your change, and the checks you ran. Include screenshots for visible admin-page changes.
+
+### Security and customer data
+
+- Never commit API keys, passwords, WordPress salts, customer information, email bodies, or real signed attachment-upload URLs. Use fake values in examples and tests.
+- Keep regional API destinations restricted to the allowlist in the settings class. Preserve HTTPS certificate verification and disabled redirects for authenticated API and signed-upload requests.
+- If a change adds a new external service or sends new categories of data, update the external-services disclosure in `readme.txt` as part of the same change.
+- Report suspected security vulnerabilities privately through [Simply Send Support](https://www.simplysend.dev/support), not in a public issue.
+
 ## Local regression checks
 
 These tests stub WordPress functions and HTTP requests; they do not send email:
 
 ```bash
+php tests/regression.php
 php tests/attachments.php
 php -d disable_functions=openssl_encrypt,openssl_decrypt,openssl_get_cipher_methods tests/regression.php --no-openssl
 ```
